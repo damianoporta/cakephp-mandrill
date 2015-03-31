@@ -5,8 +5,8 @@
  * Licensed under The MIT License
  * For full copyright and license information, please see the LICENSE.txt
  *
- * @author        Lennaert van Dijke (http://lennaert.nu)
- * @link          http://lennaert.nu
+ * @author        Damiano Porta
+ * @email         damianoporta@gmail.com  
  * @license       http://www.opensource.org/licenses/mit-license.php MIT License
  */
 namespace MandrillEmail\Network\Email;
@@ -88,16 +88,11 @@ class MandrillTransport extends AbstractTransport
         // Merge Mandrill Parameters
         $message = array_merge($message, Hash::merge($this->defaultParameters, $email->profile()['Mandrill']));
 
-        // Add receipients
-        foreach (['to', 'cc', 'bcc'] as $type) {
-            foreach ($email->{$type}() as $mail => $name) {
-                $message['to'][] = [
-                    'email' => $mail,
-                    'name'  => $name,
-                    'type'  => $type
-                ];
-            }
-        }
+        // Format attachments
+        $message = $this->_attachments($email, $message);
+        
+        // Format recipients
+        $message = $this->_recipients($email, $message);
 
         // Create a new scoped Http Client
         $this->http = new Client([
@@ -214,5 +209,61 @@ class MandrillTransport extends AbstractTransport
         }
 
         return $response->json;
+    }
+    
+    /**
+     * Format attachments for Mandrill API
+     * 
+     * @param \Cake\Network\Email\Email $email
+     * @param type $message
+     * @return array Message
+     */
+    protected function _attachments(\Cake\Network\Email\Email $email, $message = [])
+    {
+        foreach($email->attachments() as $filename => $attach)
+        {
+            $content = base64_encode(file_get_contents($attach['file']));
+            
+            if (isset($attach['contentId']))
+            {
+                $message['images'][] = [
+                    'type'    => $attach['mimetype'],
+                    'name'    => $attach['contentId'],
+                    'content' => $content,
+                ];
+            }
+            else
+            {
+                $message['attachments'][] = [
+                    'type'    => $attach['mimetype'],
+                    'name'    => $filename,
+                    'content' => $content,
+                ];
+            }
+        }
+        
+        return $message;
+    }    
+    
+    /**
+     * Format recipients for Mandrill API
+     * 
+     * @param \Cake\Network\Email\Email $email
+     * @param type $message
+     * @return array Message
+     */
+    protected function _recipients(\Cake\Network\Email\Email $email, $message = [])
+    {
+        foreach (['to', 'cc', 'bcc'] as $type) {
+            foreach ($email->{$type}() as $mail => $name) {
+                $message['to'][] = [
+                    'email' => $mail,
+                    'name'  => $name,
+                    'type'  => $type
+                ];
+            }
+        }
+        
+        return $message;
     }
 }
